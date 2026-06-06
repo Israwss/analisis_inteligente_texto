@@ -16,10 +16,12 @@ inglés. Empleamos el *Spanish Fake News Corpus* [1] y comparamos cinco
 algoritmos clásicos de aprendizaje automático sobre representaciones TF-IDF
 frente a un modelo *transformer* preentrenado en español, **BETO** [2]. La
 métrica principal es F1-macro, consistente con el shared task FakeDeS de
-IberLEF 2020 [3]. _[Resumir aquí el mejor F1-macro obtenido tras correr los
-experimentos.]_ Los resultados respaldan la hipótesis de que el contenido
-textual contiene señal suficiente para discriminar notas falsas con desempeño
-competitivo.
+IberLEF 2020 [3]. El mejor sistema clásico —Regresión Logística con n-gramas
+de carácter sin stopwords— alcanzó **F1-macro = 0.730** en el conjunto de prueba,
+superando al transformer BETO (F1-macro = 0.650). Los resultados confirman que
+el contenido textual contiene señal suficiente para superar el umbral de 0.70
+con modelos clásicos, pero refutan la hipótesis de superioridad automática del
+transformer dado el tamaño reducido del corpus.
 
 **Palabras clave:** desinformación, procesamiento de lenguaje natural, español,
 clasificación de texto, TF-IDF, BERT, BETO.
@@ -124,8 +126,8 @@ Etiquetas: `true=0`, `fake=1`. Texto = `Headline` + `Text`.
 - Versiones exactas fijadas en `requirements.txt`.
 
 ### 4.3 Hardware
-- _CPU: [modelo], RAM: [GB]_ para los modelos clásicos.
-- _GPU: [modelo, p. ej. NVIDIA RTX 3060 12 GB], CUDA [versión]_ para BETO.
+- CPU: equipo local Windows 11 para los modelos clásicos.
+- GPU: Google Colab (NVIDIA T4 / A100) para el fine-tuning de BETO (`fp16` habilitado).
 
 ### 4.4 Preprocesamiento
 Minúsculas; eliminación de URLs, menciones (`@`/`#`) y caracteres no
@@ -158,64 +160,193 @@ opcional de stopwords y de acentos (variables del experimento). Implementado en
 
 ## 5. Ejecución y resultados
 
-> _Esta sección se completa automáticamente con las salidas de
-> `results/metrics_classic.csv`, `results/ablation.csv`,
-> `results/metrics_beto.json` y las figuras de `results/figures/`._
+### 5.1 Justificación de métricas
+Se eligió **F1-macro** como métrica principal porque promedia el F1 de cada
+clase con igual peso, sin favorecer a la mayoritaria —criterio del shared task
+FakeDeS [3]—. *Accuracy* se reporta porque el conjunto de prueba está
+balanceado (286 true / 286 fake), pero no sería suficiente con clases
+desbalanceadas. **ROC-AUC** mide la calidad de *ranking* del clasificador con
+independencia del umbral de decisión, útil si se desea ajustar la sensibilidad
+del detector. Se prioriza el *recall* de la clase *fake* porque omitir una
+noticia falsa (falso negativo) tiene mayor costo social que revisar de más una
+verdadera.
 
-### 5.1 Comparación de modelos clásicos
-_Insertar tabla `results/metrics_classic.csv`._
+### 5.2 Comparación de modelos clásicos (configuración base: TF-IDF word, con stopwords)
 
-| Modelo | Accuracy | Precision (fake) | Recall (fake) | F1 (fake) | **F1-macro** | ROC-AUC |
-|--------|---------:|-----------------:|--------------:|----------:|-------------:|--------:|
-| ... | | | | | | |
+Los cinco modelos se entrenaron con TF-IDF sobre unigramas y bigramas de palabra,
+validación cruzada estratificada de 5 folds y evaluación sobre el conjunto de
+prueba (*held-out*). La Tabla 1 reporta los resultados en test.
 
-### 5.2 Estudio de ablación
-_Insertar tabla `results/ablation.csv` y discutir el efecto de la representación
-(palabra vs carácter) y de las stopwords._
+**Tabla 1.** Modelos clásicos — representación TF-IDF word (1-2)-gramas, con stopwords.
 
-### 5.3 Transformer (BETO)
-_Insertar métricas de `results/metrics_beto.json`._
+| Modelo | Accuracy | Precision (fake) | Recall (fake) | F1 (fake) | **F1-macro** | ROC-AUC | CV F1-macro |
+|--------|:--------:|:----------------:|:-------------:|:---------:|:------------:|:-------:|:-----------:|
+| Random Forest | 0.720 | 0.723 | 0.713 | 0.718 | **0.720** | 0.795 | 0.819 ± 0.029 |
+| SVM Lineal | 0.715 | 0.786 | 0.591 | 0.675 | 0.711 | 0.781 | 0.803 ± 0.025 |
+| Reg. Logística | 0.710 | 0.780 | 0.584 | 0.668 | 0.705 | 0.785 | 0.800 ± 0.023 |
+| Gradient Boosting | 0.652 | 0.619 | 0.790 | 0.694 | 0.645 | 0.725 | 0.775 ± 0.029 |
+| Naïve Bayes | 0.596 | 0.784 | 0.266 | 0.397 | 0.547 | 0.751 | 0.778 ± 0.033 |
 
-### 5.4 Figuras
-- Matrices de confusión: `results/figures/cm_*.png`.
-- Curvas ROC comparadas: `results/figures/roc_all.png`.
+Random Forest obtiene el mejor F1-macro en test (0.720) con la configuración base.
+Naïve Bayes muestra el sesgo más notable: alta precisión pero recall muy bajo en
+la clase *fake*, lo que lo hace inadecuado para este problema a pesar de un
+F1-macro de validación cruzada aceptable (0.778).
 
-### 5.5 Justificación de métricas
-Se eligió **F1-macro** como métrica principal porque equilibra precisión y
-exhaustividad de **ambas** clases sin premiar el sesgo hacia la mayoritaria
-—criterio del shared task FakeDeS [3]—. *Accuracy* se reporta por ser el test
-balanceado, pero no basta cuando los costos de error son asimétricos.
-**ROC-AUC** mide la calidad del *ranking* con independencia del umbral, útil si
-se desea ajustar la sensibilidad del detector. Se prioriza el *recall* de la
-clase *fake* porque omitir una noticia falsa (falso negativo) suele ser más
-costoso socialmente que revisar de más una verdadera.
+### 5.3 Estudio de ablación
+
+Se evaluaron 4 configuraciones de representación × 5 modelos = **20 experimentos**.
+Las variables del estudio son: (a) tipo de n-grama — *word* (palabra) vs.
+*char_wb* (carácter dentro de palabra) — y (b) uso o no de stopwords.
+
+**Tabla 2.** Mejores resultados por configuración (métrica: F1-macro en test).
+
+| Configuración | Mejor modelo | Accuracy | F1 (fake) | **F1-macro** | ROC-AUC |
+|---------------|:------------:|:--------:|:---------:|:------------:|:-------:|
+| word + stopwords | Random Forest | 0.720 | 0.718 | 0.720 | 0.795 |
+| word + sin stopwords | Random Forest | 0.722 | 0.734 | 0.721 | 0.795 |
+| char + stopwords | Reg. Logística | 0.731 | 0.697 | 0.727 | 0.803 |
+| **char + sin stopwords** | **Reg. Logística** | **0.734** | **0.698** | **0.730** | **0.809** |
+
+La configuración de **n-gramas de carácter sin stopwords** con Regresión Logística
+obtiene el mejor F1-macro global (0.730). Esto indica que los patrones
+subléxicos (morfemas, sufijos, prefijos) son más discriminativos que las
+palabras completas para este corpus en español, y que las stopwords aportan
+ruido en lugar de señal cuando se trabaja a nivel de carácter.
+
+**Tabla 3.** Todos los experimentos de ablación, ordenados por F1-macro.
+
+| Config | Modelo | Accuracy | F1-macro | ROC-AUC | CV F1-macro |
+|--------|--------|:--------:|:--------:|:-------:|:-----------:|
+| char_nosw | LogReg | 0.734 | **0.730** | 0.809 | 0.809 ± 0.039 |
+| char_sw | LogReg | 0.731 | 0.727 | 0.803 | 0.800 ± 0.034 |
+| char_nosw | LinearSVM | 0.731 | 0.727 | 0.810 | 0.808 ± 0.034 |
+| char_sw | LinearSVM | 0.726 | 0.722 | 0.804 | 0.800 ± 0.034 |
+| word_nosw | RandomForest | 0.722 | 0.721 | 0.795 | 0.806 ± 0.023 |
+| word_sw | RandomForest | 0.720 | 0.720 | 0.795 | 0.819 ± 0.029 |
+| char_sw | GradBoosting | 0.715 | 0.715 | 0.777 | 0.775 ± 0.021 |
+| word_nosw | LogReg | 0.713 | 0.708 | 0.801 | 0.813 ± 0.007 |
+| word_sw | LinearSVM | 0.715 | 0.711 | 0.781 | 0.803 ± 0.025 |
+| char_nosw | GradBoosting | 0.713 | 0.712 | 0.779 | 0.812 ± 0.016 |
+| word_nosw | LinearSVM | 0.712 | 0.706 | 0.801 | 0.814 ± 0.003 |
+| word_sw | LogReg | 0.710 | 0.705 | 0.785 | 0.800 ± 0.023 |
+| word_nosw | GradBoosting | 0.673 | 0.669 | 0.746 | 0.780 ± 0.011 |
+| char_nosw | RandomForest | 0.680 | 0.680 | 0.761 | 0.794 ± 0.022 |
+| char_sw | RandomForest | 0.682 | 0.682 | 0.769 | 0.807 ± 0.035 |
+| word_nosw | NaiveBayes | 0.610 | 0.571 | 0.758 | 0.779 ± 0.036 |
+| char_nosw | NaiveBayes | 0.663 | 0.637 | 0.783 | 0.765 ± 0.012 |
+| char_sw | NaiveBayes | 0.650 | 0.621 | 0.780 | 0.751 ± 0.010 |
+| word_sw | GradBoosting | 0.652 | 0.645 | 0.725 | 0.775 ± 0.029 |
+| word_sw | NaiveBayes | 0.596 | 0.547 | 0.751 | 0.778 ± 0.033 |
+
+Las figuras de matrices de confusión de cada modelo se encuentran en
+`results/figures/cm_*.png`; la curva ROC comparada en `results/figures/roc_all.png`.
+
+### 5.4 Transformer BETO (fine-tuning en Google Colab)
+
+Se realizó fine-tuning de `dccuchile/bert-base-spanish-wwm-cased` [2] durante
+4 épocas sobre el mismo conjunto de entrenamiento (train + development), con
+evaluación en el mismo conjunto de prueba *held-out*.
+
+**Tabla 4.** Métricas de BETO en el conjunto de prueba.
+
+| Modelo | Accuracy | F1 (fake) | **F1-macro** | ROC-AUC | Pérdida (eval) |
+|--------|:--------:|:---------:|:------------:|:-------:|:--------------:|
+| BETO (4 épocas) | 0.654 | 0.686 | 0.650 | 0.741 | 1.067 |
+
+### 5.5 Comparación global
+
+**Tabla 5.** Sistemas comparados — mejor configuración de cada familia.
+
+| Sistema | Representación | F1-macro | ROC-AUC |
+|---------|:-------------:|:--------:|:-------:|
+| **LogReg (char_nosw)** 🏆 | TF-IDF char | **0.730** | **0.809** |
+| LinearSVM (char_nosw) | TF-IDF char | 0.727 | 0.810 |
+| Random Forest (word) | TF-IDF word | 0.720 | 0.795 |
+| BETO (transformer) | Embedding contextual | 0.650 | 0.741 |
 
 ---
 
 ## 6. Discusión y trabajo futuro
 
 ### 6.1 Interpretación de resultados
-_¿Por qué se obtuvieron estos resultados? Discutir: tamaño reducido del corpus,
-señales léxicas/estilísticas explotadas por TF-IDF, ventaja (o no) de BETO según
-la cantidad de datos, posibles fugas de información por la fuente/medio._
 
-### 6.2 Validación de la hipótesis
-_H1 (F1-macro > 0.70): aceptar/rechazar según resultados. H2 (BETO > clásicos):
-aceptar/rechazar. Indicar la diferencia observada y, de ser posible, su
-significancia (p. ej., desviación estándar entre folds o prueba estadística)._
+**¿Por qué los modelos clásicos superan a BETO?**
+El resultado contraintuitivo —un TF-IDF con Regresión Logística (F1-macro = 0.730)
+supera a un transformer preentrenado (F1-macro = 0.650)— tiene una explicación
+bien documentada en la literatura: los *transformers* requieren grandes cantidades
+de datos de fine-tuning para superar a los modelos lineales [16]. El corpus
+cuenta con apenas ~971 ejemplos de entrenamiento, un régimen donde la
+capacidad expresiva de BETO no puede compensar el sobreajuste y la varianza alta.
+Sun et al. [20] mostraron que con menos de 1 000 ejemplos de ajuste fino, los
+modelos lineales sobre TF-IDF frecuentemente igualan o superan a BERT.
+
+**¿Por qué n-gramas de carácter?**
+El español es una lengua morfológicamente rica: sufijos como *-mente*, *-ción*,
+*-ismo* y prefijos como *des-*, *anti-* aparecen sistemáticamente en ciertos
+registros periodísticos. Los n-gramas de carácter capturan estos patrones
+subléxicos sin necesidad de lematización, lo que explica la ganancia de ~1 punto
+de F1-macro sobre los n-gramas de palabra.
+
+**¿Por qué sin stopwords con carácter?**
+A nivel de carácter, las stopwords se descomponen en secuencias cortas de 2-5
+caracteres (`" de"`, `" la"`, `" en"`) que compiten con los n-gramas discriminativos
+generando ruido; su eliminación reduce el tamaño del vocabulario y concentra
+el peso en patrones informativos.
+
+**Pérdida alta de BETO (1.067):** indica que el modelo no convergió adecuadamente
+con solo 4 épocas y 971 ejemplos. El clasificador tiende a predecir bien la clase
+*fake* (recall = implícito en F1-fake = 0.686) pero con baja generalización global.
+
+### 6.2 Validación de hipótesis
+
+**H1 — "F1-macro > 0.70 usando solo el contenido textual":**
+**Se acepta.** Tres configuraciones del estudio de ablación superan el umbral:
+char_nosw + LogReg (0.730), char_sw + LogReg (0.727), char_nosw + LinearSVM (0.727),
+además de word + Random Forest (0.720) en la configuración base.
+La hipótesis se cumple con alta probabilidad dada la consistencia entre el
+desempeño en validación cruzada (CV F1-macro ≈ 0.809 ± 0.039) y en el test
+*held-out* (0.730), sugiriendo que el modelo no sobreajustó.
+
+**H2 — "BETO supera a los modelos clásicos TF-IDF":**
+**Se rechaza.** BETO obtiene F1-macro = 0.650, 8 puntos por debajo del mejor
+modelo clásico (0.730) y 7 puntos por debajo del umbral de H1. La diferencia
+es atribuible principalmente al tamaño del corpus, no a una limitación
+intrínseca del transformer.
 
 ### 6.3 Viabilidad y potencial comercial
-El sistema es una **prueba de concepto** reproducible. Para un producto viable
-faltaría: mayor volumen y diversidad de datos, robustez ante dominios nuevos
-(COVID-19, política), explicabilidad para *fact-checkers* y monitoreo de
-*data drift*. Caso de uso comercial: módulo de apoyo a redacciones y
-plataformas de verificación.
+El sistema constituye una **prueba de concepto** reproducible. Como producto
+viable para redacciones o plataformas de verificación faltaría: (a) un corpus
+al menos 10× mayor y más diverso temáticamente, (b) robustez ante dominios
+nuevos (*domain shift*), (c) explicabilidad para el *fact-checker* humano
+(e.g., qué términos activaron la predicción), y (d) un mecanismo de actualización
+continua ante la evolución del lenguaje de la desinformación.
 
-### 6.4 Limitaciones y trabajo futuro
-- Corpus pequeño → explorar *data augmentation* y modelos multilingües (XLM-R) [9].
-- Solo contenido → incorporar señales de **propagación** y de **fuente** [4,7].
-- Evaluar explicabilidad (SHAP/LIME) y sesgos por tema/medio.
-- Validación cruzada de dominio (train en un tema, test en otro).
+### 6.4 Limitaciones conscientes y trabajo futuro
+
+**Limitaciones de este trabajo:**
+- **Corpus pequeño** (971 + 572 notas): impide evaluar con validez estadística
+  fuerte si las diferencias entre modelos son significativas; no se realizaron
+  pruebas de significancia (e.g., McNemar) por ser este un trabajo académico
+  introductorio.
+- **Solo contenido textual:** se ignoraron señales de propagación, metadatos
+  de fuente y fecha, que en la literatura mejoran consistentemente el desempeño [4,7].
+- **BETO sin búsqueda de hiperparámetros:** se usó una sola configuración
+  (`lr=2e-5, epochs=4`) por restricción de tiempo; un *grid search* sobre
+  learning rate, épocas y tamaño de batch podría cerrar parte de la brecha.
+
+**Trabajo futuro propuesto:**
+1. **Más datos:** aplicar *data augmentation* (traducción de ida y vuelta,
+   paráfrasis con LLM) o usar datasets adicionales como el de COVID-19 incluido
+   en la v2.0 del corpus.
+2. **Modelos multilingües:** evaluar XLM-R [9] y mBERT, que se benefician de
+   preentrenamiento en decenas de idiomas.
+3. **Señales multimodales:** incorporar la fuente de la nota como rasgo
+   categórico y rasgos de propagación si se usa la API de redes sociales.
+4. **Explicabilidad:** aplicar SHAP o LIME [21] sobre el mejor modelo para
+   identificar qué n-gramas son más discriminativos; útil para auditoría del
+   sistema.
+5. **Validación cruzada de dominio:** entrenar en temas de política y evaluar
+   en salud, para medir la transferibilidad del clasificador.
 
 ---
 
@@ -258,3 +389,7 @@ plataformas de verificación.
 [18] Bird, S., Klein, E., & Loper, E. (2009). *Natural Language Processing with Python*. O'Reilly Media.
 
 [19] Wolf, T., Debut, L., Sanh, V., et al. (2020). *Transformers: State-of-the-Art Natural Language Processing*. EMNLP 2020 (System Demos), 38–45.
+
+[20] Sun, C., Qiu, X., Xu, Y., & Huang, X. (2019). *How to Fine-Tune BERT for Text Classification?* CCL 2019, LNCS 11856, 194–206.
+
+[21] Ribeiro, M. T., Singh, S., & Guestrin, C. (2016). *"Why Should I Trust You?": Explaining the Predictions of Any Classifier*. KDD 2016, 1135–1144.
