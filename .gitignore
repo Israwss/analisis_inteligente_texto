@@ -1,0 +1,25 @@
+# Datos descargados (se regeneran con `python main.py download`)
+data/raw/
+data/processed/
+
+# Modelos serializados (pesados; se regeneran al entrenar)
+models/*.joblib
+models/beto/
+
+# NOTA: results/ (figuras, CSV, JSON) SÍ se versiona a propósito,
+# para que el profesor pueda revisar los resultados sin reejecutar.
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.ipynb_checkpoints/
+
+# Sistema / editores
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
