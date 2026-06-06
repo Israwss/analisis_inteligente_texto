@@ -1,15 +1,15 @@
-# Detección Inteligente de Noticias Falsas en Español 📰🤖
+# Detección Inteligente de Noticias Falsas en Español
 
 Proyecto de **análisis inteligente de textos** que clasifica notas periodísticas
 en español como **verdaderas** o **falsas**, comparando modelos de *Machine
 Learning* clásico (TF-IDF + 5 algoritmos) contra un *transformer* en español
 (**BETO**).
 
-> Asignatura / contexto: Análisis Inteligente de Textos — Facultad de Ingeniería, UNAM.
+> Asignatura: Análisis Inteligente de Textos — Facultad de Ingeniería, UNAM.
 
 ---
 
-## 🎯 Problema y motivación
+## Problema y motivación
 La desinformación en redes y medios digitales tiene impacto social directo
 (salud pública, procesos electorales, polarización). Detectarla automáticamente
 en **español** —idioma con menos recursos que el inglés— es un problema abierto
@@ -19,7 +19,7 @@ y socialmente relevante.
 con F1-macro > 0.70 usando únicamente el contenido textual, y los modelos
 basados en *transformers* (BETO) superan a los modelos clásicos TF-IDF.
 
-## 📚 Dataset
+## Dataset
 **Spanish Fake News Corpus** (Posadas-Durán et al., 2019), base del shared task
 **FakeDeS / IberLEF 2020**. Licencia CC-BY-4.0.
 Repositorio: <https://github.com/jpposadas/FakeNewsCorpusSpanish>
@@ -32,7 +32,7 @@ Repositorio: <https://github.com/jpposadas/FakeNewsCorpusSpanish>
 
 La descarga es **automática** (`python main.py download`).
 
-## 🏗️ Estructura del repositorio
+## Estructura del repositorio
 ```
 .
 ├── main.py                 # CLI orquestador
@@ -47,7 +47,7 @@ La descarga es **automática** (`python main.py download`).
 └── models/                 # modelos serializados (generados)
 ```
 
-## ⚙️ Instalación
+## Instalación
 ```bash
 # 1) Entorno
 python -m venv .venv
@@ -57,17 +57,17 @@ python -m venv .venv
 # 2) Dependencias
 pip install -r requirements.txt
 ```
-> Si **solo** usarás el pipeline clásico, puedes omitir `torch/transformers/datasets`.
+> Si solo se usará el pipeline clásico, pueden omitirse `torch/transformers/datasets`.
 
-## ▶️ Reproducir los experimentos
+## Reproducir los experimentos
 ```bash
-python main.py download              # descarga el corpus (~pocos MB)
+python main.py download              # descarga el corpus
 python main.py stats                 # estadísticas del dataset
 
 # ML clásico: 5 modelos, validación cruzada 5-fold, métricas + figuras
 python main.py classic
 
-# Estudio de ablación: word vs char-ngram × con/sin stopwords (20 experimentos)
+# Estudio de ablación: word vs char-ngram x con/sin stopwords (20 experimentos)
 python main.py ablation
 
 # Transformer en español (requiere GPU)
@@ -84,14 +84,14 @@ python main.py all
 - `results/figures/` — matrices de confusión y curvas ROC.
 - `models/` — mejor modelo serializado (`.joblib`) y BETO fine-tuneado.
 
-## 📏 Métricas de evaluación
+## Métricas de evaluación
 - **Accuracy** (referencia; el test está balanceado).
 - **Precision / Recall / F1** de la clase *fake* (la clase de interés).
-- **F1-macro** — métrica principal (la del shared task FakeDeS, no premia
+- **F1-macro** — métrica principal (criterio del shared task FakeDeS; no premia
   el sesgo hacia la clase mayoritaria).
 - **ROC-AUC** — capacidad de *ranking* independiente del umbral.
 
-## 🔬 Modelos comparados
+## Modelos comparados
 | Familia            | Modelos |
 |--------------------|---------|
 | Probabilístico     | Multinomial Naïve Bayes |
@@ -99,21 +99,21 @@ python main.py all
 | Ensambles          | Random Forest, Gradient Boosting |
 | Transformer (es)   | BETO (`dccuchile/bert-base-spanish-wwm-cased`) |
 
-## 🧪 Reproducibilidad
+## Reproducibilidad
 `random_state = 42` en todos los componentes estocásticos; validación cruzada
 estratificada de 5 *folds*; versiones fijadas en `requirements.txt`.
 
-## 📄 Documento científico
-Ver [`paper/paper.md`](paper/paper.md) — incluye Introducción, Estado de la
+## Documento científico
+Ver [`paper/paper.pdf`](paper/paper.md) — incluye Introducción, Estado de la
 técnica, Marco teórico, Setup experimental, Resultados, Discusión/Trabajo futuro
-y Bibliografía.
+y Bibliografía (21 referencias).
 
-## 🤝 Equipo
-| Integrante | GitHub | Rol |
-|------------|--------|-----|
-| _Nombre 1_ | _@usuario_ | _rol_ |
-| _Nombre 2_ | _@usuario_ | _rol_ |
+## Equipo
+| Integrante              |  GitHub  |    Rol    |
+|-------------------------|----------|-----------|
+| Israel Martinez Jimenez | @israwss | developer |
 
-## 📜 Licencia
-Código bajo licencia MIT. El corpus se usa bajo CC-BY-4.0 (ver repositorio
+
+## Licencia
+Código bajo licencia MIT. El corpus se distribuye bajo CC-BY-4.0 (ver repositorio
 original y cita correspondiente).
